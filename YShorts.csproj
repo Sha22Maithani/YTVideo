@@ -8,8 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="FFMPEG.NET" Version="1.0.0" />
-    <PackageReference Include="YoutubeExplode" Version="6.3.4" />
-    <PackageReference Include="YoutubeExplode.Converter" Version="6.3.4" />
+    <PackageReference Include="YoutubeExplode" Version="6.5.4" />
+    <PackageReference Include="YoutubeExplode.Converter" Version="6.5.4" />
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 

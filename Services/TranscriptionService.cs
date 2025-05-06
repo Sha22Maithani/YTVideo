@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Linq;
 using YShorts.Models;
 using YoutubeExplode;
-using YoutubeExplode.Converter;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
 
@@ -71,23 +70,35 @@ namespace YShorts.Services
             
             _logger.LogInformation("Downloading audio from YouTube video {VideoId}", videoId);
             
-            // Get the stream manifest
-            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(videoId);
-            
-            // Get the audio with highest bitrate using LINQ
-            var audioStreamInfo = streamManifest.GetAudioOnlyStreams()
-                .OrderByDescending(s => s.Bitrate)
-                .FirstOrDefault();
-
-            if (audioStreamInfo == null)
+            try
             {
-                throw new InvalidOperationException("No audio streams found for the video");
+                // Get video info
+                var video = await youtube.Videos.GetAsync(videoId);
+                _logger.LogInformation("Successfully retrieved video info: {Title}", video.Title);
+                
+                // Get the stream manifest
+                var streamManifest = await youtube.Videos.Streams.GetManifestAsync(videoId);
+                
+                // Get audio-only stream with highest bitrate
+                var audioStreamInfo = streamManifest.GetAudioOnlyStreams()
+                    .OrderByDescending(s => s.Bitrate)
+                    .FirstOrDefault();
+
+                if (audioStreamInfo == null)
+                {
+                    throw new InvalidOperationException("No audio streams found for this video");
+                }
+                
+                // Download the audio stream
+                await youtube.Videos.Streams.DownloadAsync(audioStreamInfo, outputPath);
+                
+                return outputPath;
             }
-            
-            // Download the audio
-            await youtube.Videos.Streams.DownloadAsync(audioStreamInfo, outputPath);
-            
-            return outputPath;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting audio from YouTube: {Message}", ex.Message);
+                throw new InvalidOperationException($"Failed to extract audio: {ex.Message}", ex);
+            }
         }
 
         private async Task<string> UploadAudioFileAsync(string audioFilePath)
