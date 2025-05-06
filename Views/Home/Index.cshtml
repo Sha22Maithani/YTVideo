@@ -27,6 +27,12 @@
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="best-moments-tab" data-bs-toggle="tab" data-bs-target="#best-moments" 
+                                    type="button" role="tab" aria-selected="false">
+                                <i class="fas fa-star me-1"></i>Best Moments
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
                             <button class="nav-link" id="shorts-tab" data-bs-toggle="tab" data-bs-target="#shorts" 
                                     type="button" role="tab" aria-selected="false">
                                 <i class="fas fa-cut me-1"></i>Create Shorts
@@ -52,6 +58,27 @@
                                     <button type="submit" class="btn btn-youtube" id="transcribeBtn">
                                         <span id="btnSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
                                         Transcribe Video
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Best Moments Tab -->
+                        <div class="tab-pane fade" id="best-moments" role="tabpanel" aria-labelledby="best-moments-tab">
+                            <form id="bestMomentsForm">
+                                <div class="form-group mb-3">
+                                    <label for="bestMomentsYoutubeUrl" class="form-label">Enter YouTube Video URL:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fab fa-youtube"></i></span>
+                                        <input type="url" class="form-control" id="bestMomentsYoutubeUrl" 
+                                               placeholder="https://www.youtube.com/watch?v=..." required>
+                                    </div>
+                                    <div class="form-text">Paste the URL of the YouTube video to extract best moments</div>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-youtube" id="findBestMomentsBtn">
+                                        <span id="bestMomentsSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+                                        Find Best Moments
                                     </button>
                                 </div>
                             </form>
@@ -120,6 +147,21 @@
                         </div>
                     </div>
                     
+                    <div id="bestMomentsResultContainer" class="d-none">
+                        <h5>Best Moments:</h5>
+                        <div class="list-group mb-3" id="bestMomentsList">
+                            <!-- Best moments will be dynamically added here -->
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button class="btn btn-sm btn-outline-secondary" id="copyBestMomentsBtn">
+                                <i class="fas fa-copy me-1"></i>Copy to Clipboard
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" id="downloadBestMomentsBtn">
+                                <i class="fas fa-download me-1"></i>Download
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div id="shortsResultContainer" class="d-none">
                         <h5>Generated Shorts:</h5>
                         <div id="shortsResults" class="list-group mb-3">
@@ -174,6 +216,16 @@
                         <div class="flex-grow-1 ms-3">
                             <h5>Easy Sharing</h5>
                             <p>Download your shorts and transcriptions for immediate use on social media platforms.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-star text-danger fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5>Best Moments Detection</h5>
+                            <p>Automatically identify the most interesting or significant moments from your videos using Gemini AI.</p>
                         </div>
                     </div>
                 </div>
@@ -234,6 +286,7 @@
             const resultCard = document.getElementById('resultCard');
             const transcriptionResultContainer = document.getElementById('transcriptionResultContainer');
             const shortsResultContainer = document.getElementById('shortsResultContainer');
+            const bestMomentsResultContainer = document.getElementById('bestMomentsResultContainer');
             const transcriptionResult = document.getElementById('transcriptionResult');
             
             // Reset UI
@@ -264,6 +317,7 @@
                 resultCard.classList.remove('d-none');
                 transcriptionResultContainer.classList.remove('d-none');
                 shortsResultContainer.classList.add('d-none');
+                bestMomentsResultContainer.classList.add('d-none');
                 
                 // Scroll to results
                 resultCard.scrollIntoView({ behavior: 'smooth' });
@@ -281,6 +335,78 @@
             }
         });
         
+        // Best Moments Form Submit
+        document.getElementById('bestMomentsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const youtubeUrl = document.getElementById('bestMomentsYoutubeUrl').value;
+            const findBestMomentsBtn = document.getElementById('findBestMomentsBtn');
+            const bestMomentsSpinner = document.getElementById('bestMomentsSpinner');
+            const errorMessage = document.getElementById('errorMessage');
+            const resultCard = document.getElementById('resultCard');
+            const transcriptionResultContainer = document.getElementById('transcriptionResultContainer');
+            const shortsResultContainer = document.getElementById('shortsResultContainer');
+            const bestMomentsResultContainer = document.getElementById('bestMomentsResultContainer');
+            const bestMomentsList = document.getElementById('bestMomentsList');
+            
+            // Reset UI
+            errorMessage.classList.add('d-none');
+            errorMessage.textContent = '';
+            bestMomentsList.innerHTML = '';
+            
+            // Show loading state
+            findBestMomentsBtn.disabled = true;
+            bestMomentsSpinner.classList.remove('d-none');
+            
+            try {
+                const response = await fetch('/api/transcription/transcribe-and-extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ youtubeUrl })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.errorMessage || 'Failed to extract best moments');
+                }
+                
+                // Display results
+                bestMomentsList.innerHTML = data.bestMoments.map((moment, index) => `
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between mb-2">
+                            <h6 class="mb-1">Best Moment #${index + 1}</h6>
+                            <small class="text-muted">${moment.startTimestamp} - ${moment.endTimestamp}</small>
+                        </div>
+                        <p class="mb-1">${moment.content}</p>
+                        <small class="text-muted"><strong>Why it's great:</strong> ${moment.reason}</small>
+                    </div>
+                `).join('');
+                
+                // Display result
+                resultCard.classList.remove('d-none');
+                transcriptionResultContainer.classList.add('d-none');
+                shortsResultContainer.classList.add('d-none');
+                bestMomentsResultContainer.classList.remove('d-none');
+                
+                // Scroll to results
+                resultCard.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                // Show error
+                errorMessage.textContent = error.message || "An error occurred while extracting best moments.";
+                errorMessage.classList.remove('d-none');
+                resultCard.classList.remove('d-none');
+                
+            } finally {
+                // Reset loading state
+                findBestMomentsBtn.disabled = false;
+                bestMomentsSpinner.classList.add('d-none');
+            }
+        });
+        
         // Shorts Form Submit - This is a placeholder since the endpoint isn't implemented yet
         document.getElementById('shortsForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -294,6 +420,7 @@
             const resultCard = document.getElementById('resultCard');
             const transcriptionResultContainer = document.getElementById('transcriptionResultContainer');
             const shortsResultContainer = document.getElementById('shortsResultContainer');
+            const bestMomentsResultContainer = document.getElementById('bestMomentsResultContainer');
             const shortsResults = document.getElementById('shortsResults');
             
             // Reset UI
@@ -351,6 +478,7 @@
                 resultCard.classList.remove('d-none');
                 transcriptionResultContainer.classList.add('d-none');
                 shortsResultContainer.classList.remove('d-none');
+                bestMomentsResultContainer.classList.add('d-none');
                 
                 // Scroll to results
                 resultCard.scrollIntoView({ behavior: 'smooth' });
@@ -388,6 +516,48 @@
             const a = document.createElement('a');
             a.href = url;
             a.download = 'transcription.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+        
+        // Copy Best Moments to Clipboard
+        document.getElementById('copyBestMomentsBtn').addEventListener('click', function() {
+            const moments = Array.from(document.querySelectorAll('#bestMomentsList .list-group-item'))
+                .map((item, index) => {
+                    const title = item.querySelector('h6').textContent;
+                    const timestamp = item.querySelector('small.text-muted').textContent;
+                    const content = item.querySelector('p').textContent;
+                    const reason = item.querySelector('small.text-muted:last-child').textContent;
+                    return `${title}\n${timestamp}\n${content}\n${reason}\n`;
+                }).join('\n');
+                
+            navigator.clipboard.writeText(moments).then(() => {
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 2000);
+            });
+        });
+        
+        // Download Best Moments
+        document.getElementById('downloadBestMomentsBtn').addEventListener('click', function() {
+            const moments = Array.from(document.querySelectorAll('#bestMomentsList .list-group-item'))
+                .map((item, index) => {
+                    const title = item.querySelector('h6').textContent;
+                    const timestamp = item.querySelector('small.text-muted').textContent;
+                    const content = item.querySelector('p').textContent;
+                    const reason = item.querySelector('small.text-muted:last-child').textContent;
+                    return `${title}\n${timestamp}\n${content}\n${reason}\n`;
+                }).join('\n');
+                
+            const blob = new Blob([moments], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'best_moments.txt';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

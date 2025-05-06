@@ -5,9 +5,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<TranscriptionService>();
+builder.Services.AddSingleton<GeminiService>();
 
-// Register AssemblyAI API key in configuration
+// Register API keys in configuration
 builder.Configuration["AssemblyAI:ApiKey"] = "af7c531f7d254d27afb91b1b25f400de";
+builder.Configuration["Google:ApiKey"] = "AIzaSyCGMnW4ZC7CCVL1K4HfVlv0kxHbxg0AB-Y";
 
 var app = builder.Build();
 

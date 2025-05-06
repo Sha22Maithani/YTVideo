@@ -35,4 +35,20 @@ namespace YShorts.Models
         [JsonPropertyName("error")]
         public string? Error { get; set; }
     }
+    
+    // Best Moments Models
+    public class BestMoment
+    {
+        public string Content { get; set; } = string.Empty;
+        public string StartTimestamp { get; set; } = string.Empty;
+        public string EndTimestamp { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+    }
+    
+    public class BestMomentsResponse
+    {
+        public List<BestMoment> Moments { get; set; } = new List<BestMoment>();
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
 } 
