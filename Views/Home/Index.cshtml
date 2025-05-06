@@ -1,0 +1,397 @@
+﻿@{
+    ViewData["Title"] = "YShorts - YouTube Video Processing";
+}
+
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 fw-bold">Create <span style="color: #FF0000;">YouTube Shorts</span> Easily</h1>
+            <p class="lead">Upload your long-form video, get transcription, and create engaging short videos.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Video Processing Form -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 rounded-3 mb-4">
+                <div class="card-header bg-dark text-white py-3">
+                    <h4 class="mb-0"><i class="fas fa-video me-2"></i>YouTube Video Processor</h4>
+                </div>
+                <div class="card-body p-4">
+                    <!-- Processing Type Tabs -->
+                    <ul class="nav nav-tabs mb-4" id="processingTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="transcribe-tab" data-bs-toggle="tab" data-bs-target="#transcribe" 
+                                    type="button" role="tab" aria-selected="true">
+                                <i class="fas fa-microphone-alt me-1"></i>Transcribe
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="shorts-tab" data-bs-toggle="tab" data-bs-target="#shorts" 
+                                    type="button" role="tab" aria-selected="false">
+                                <i class="fas fa-cut me-1"></i>Create Shorts
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="processingTabsContent">
+                        <!-- Transcription Tab -->
+                        <div class="tab-pane fade show active" id="transcribe" role="tabpanel" aria-labelledby="transcribe-tab">
+                            <form id="transcriptionForm">
+                                <div class="form-group mb-3">
+                                    <label for="youtubeUrl" class="form-label">Enter YouTube Video URL:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fab fa-youtube"></i></span>
+                                        <input type="url" class="form-control" id="youtubeUrl" 
+                                               placeholder="https://www.youtube.com/watch?v=..." required>
+                                    </div>
+                                    <div class="form-text">Paste the URL of the YouTube video you want to transcribe</div>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-youtube" id="transcribeBtn">
+                                        <span id="btnSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+                                        Transcribe Video
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Create Shorts Tab -->
+                        <div class="tab-pane fade" id="shorts" role="tabpanel" aria-labelledby="shorts-tab">
+                            <form id="shortsForm">
+                                <div class="form-group mb-3">
+                                    <label for="shortsYoutubeUrl" class="form-label">Enter YouTube Video URL:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fab fa-youtube"></i></span>
+                                        <input type="url" class="form-control" id="shortsYoutubeUrl" 
+                                               placeholder="https://www.youtube.com/watch?v=..." required>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="shortsCount" class="form-label">Number of shorts to create:</label>
+                                    <input type="number" class="form-control" id="shortsCount" min="1" max="10" value="3">
+                                    <div class="form-text">How many short videos should be created from your content</div>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="shortsDuration" class="form-label">Duration per short (seconds):</label>
+                                    <input type="range" class="form-range" id="shortsDuration" min="15" max="60" step="5" value="30">
+                                    <div class="d-flex justify-content-between">
+                                        <span>15s</span>
+                                        <span id="durationValue">30s</span>
+                                        <span>60s</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-youtube" id="createShortsBtn">
+                                        <span id="shortsSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+                                        Create Shorts
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Result Container -->
+            <div class="card shadow-sm border-0 rounded-3 d-none" id="resultCard">
+                <div class="card-header bg-success text-white py-3">
+                    <h4 class="mb-0"><i class="fas fa-check-circle me-2"></i>Processing Result</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-danger d-none" id="errorMessage"></div>
+                    
+                    <div id="transcriptionResultContainer" class="d-none">
+                        <h5>Transcription:</h5>
+                        <div class="border p-3 bg-light rounded mb-3">
+                            <pre id="transcriptionResult" class="mb-0" style="white-space: pre-wrap;"></pre>
+                        </div>
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button class="btn btn-sm btn-outline-secondary" id="copyTranscriptionBtn">
+                                <i class="fas fa-copy me-1"></i>Copy to Clipboard
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" id="downloadTranscriptionBtn">
+                                <i class="fas fa-download me-1"></i>Download
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="shortsResultContainer" class="d-none">
+                        <h5>Generated Shorts:</h5>
+                        <div id="shortsResults" class="list-group mb-3">
+                            <!-- Short clips will be dynamically added here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Column: Features and Information -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 rounded-3 mb-4">
+                <div class="card-header bg-dark text-white py-3">
+                    <h4 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Why Use YShorts?</h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-microphone-alt text-danger fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5>Accurate Transcription</h5>
+                            <p>Get high-quality transcriptions powered by AssemblyAI's advanced speech recognition technology.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-cut text-danger fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5>Smart Video Clips</h5>
+                            <p>Automatically create engaging shorts from your long-form content using AI-powered content analysis.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex mb-3">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-bolt text-danger fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5>Fast Processing</h5>
+                            <p>Quick turnaround times even for longer videos, so you can start using your content right away.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-share-alt text-danger fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5>Easy Sharing</h5>
+                            <p>Download your shorts and transcriptions for immediate use on social media platforms.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card shadow-sm border-0 rounded-3">
+                <div class="card-header bg-dark text-white py-3">
+                    <h4 class="mb-0"><i class="fas fa-question-circle me-2"></i>How It Works</h4>
+                </div>
+                <div class="card-body p-4">
+                    <ol class="list-group list-group-numbered mb-0">
+                        <li class="list-group-item border-0 d-flex">
+                            <div class="ms-2">
+                                <div class="fw-bold">Paste your YouTube URL</div>
+                                Enter the URL of any YouTube video you want to process
+                            </div>
+                        </li>
+                        <li class="list-group-item border-0 d-flex">
+                            <div class="ms-2">
+                                <div class="fw-bold">Choose your processing option</div>
+                                Select transcription or shorts creation
+                            </div>
+                        </li>
+                        <li class="list-group-item border-0 d-flex">
+                            <div class="ms-2">
+                                <div class="fw-bold">Get results quickly</div>
+                                Our system processes your video and delivers results in minutes
+                            </div>
+                        </li>
+                        <li class="list-group-item border-0 d-flex">
+                            <div class="ms-2">
+                                <div class="fw-bold">Download and share</div>
+                                Use the generated content for your social media strategy
+                            </div>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Update duration value display
+        document.getElementById('shortsDuration').addEventListener('input', function() {
+            document.getElementById('durationValue').textContent = this.value + 's';
+        });
+        
+        // Transcription Form Submit
+        document.getElementById('transcriptionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const youtubeUrl = document.getElementById('youtubeUrl').value;
+            const transcribeBtn = document.getElementById('transcribeBtn');
+            const btnSpinner = document.getElementById('btnSpinner');
+            const errorMessage = document.getElementById('errorMessage');
+            const resultCard = document.getElementById('resultCard');
+            const transcriptionResultContainer = document.getElementById('transcriptionResultContainer');
+            const shortsResultContainer = document.getElementById('shortsResultContainer');
+            const transcriptionResult = document.getElementById('transcriptionResult');
+            
+            // Reset UI
+            errorMessage.classList.add('d-none');
+            errorMessage.textContent = '';
+            
+            // Show loading state
+            transcribeBtn.disabled = true;
+            btnSpinner.classList.remove('d-none');
+            
+            try {
+                const response = await fetch('/api/transcription/transcribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ youtubeUrl })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.errorMessage || 'Failed to transcribe video');
+                }
+                
+                // Display result
+                transcriptionResult.textContent = data.text;
+                resultCard.classList.remove('d-none');
+                transcriptionResultContainer.classList.remove('d-none');
+                shortsResultContainer.classList.add('d-none');
+                
+                // Scroll to results
+                resultCard.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                // Show error
+                errorMessage.textContent = error.message;
+                errorMessage.classList.remove('d-none');
+                resultCard.classList.remove('d-none');
+                
+            } finally {
+                // Reset loading state
+                transcribeBtn.disabled = false;
+                btnSpinner.classList.add('d-none');
+            }
+        });
+        
+        // Shorts Form Submit - This is a placeholder since the endpoint isn't implemented yet
+        document.getElementById('shortsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const youtubeUrl = document.getElementById('shortsYoutubeUrl').value;
+            const shortsCount = document.getElementById('shortsCount').value;
+            const shortsDuration = document.getElementById('shortsDuration').value;
+            const createShortsBtn = document.getElementById('createShortsBtn');
+            const shortsSpinner = document.getElementById('shortsSpinner');
+            const errorMessage = document.getElementById('errorMessage');
+            const resultCard = document.getElementById('resultCard');
+            const transcriptionResultContainer = document.getElementById('transcriptionResultContainer');
+            const shortsResultContainer = document.getElementById('shortsResultContainer');
+            const shortsResults = document.getElementById('shortsResults');
+            
+            // Reset UI
+            errorMessage.classList.add('d-none');
+            errorMessage.textContent = '';
+            shortsResults.innerHTML = '';
+            
+            // Show loading state
+            createShortsBtn.disabled = true;
+            shortsSpinner.classList.remove('d-none');
+            
+            try {
+                const response = await fetch('/api/shorts/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        youtubeUrl: youtubeUrl,
+                        count: parseInt(shortsCount),
+                        duration: parseInt(shortsDuration)
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.errorMessage || 'Failed to generate shorts');
+                }
+                
+                // Display results
+                shortsResults.innerHTML = data.shorts.map(short => `
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <img src="${short.thumbnailUrl}" class="img-thumbnail me-3" style="width: 80px; height: 80px;">
+                                <div>
+                                    <h6 class="mb-1">Short #${short.id}: ${short.title}</h6>
+                                    <p class="mb-1"><small>Duration: ${short.duration}</small></p>
+                                </div>
+                            </div>
+                            <div>
+                                <a href="${short.downloadUrl}" class="btn btn-sm btn-outline-primary me-2" ${short.downloadUrl === '#' ? 'disabled' : ''}>
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                                <button class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-share-alt me-1"></i>Share
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Display result
+                resultCard.classList.remove('d-none');
+                transcriptionResultContainer.classList.add('d-none');
+                shortsResultContainer.classList.remove('d-none');
+                
+                // Scroll to results
+                resultCard.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                // Show error
+                errorMessage.textContent = error.message || "An error occurred while generating shorts.";
+                errorMessage.classList.remove('d-none');
+                resultCard.classList.remove('d-none');
+                
+            } finally {
+                // Reset loading state
+                createShortsBtn.disabled = false;
+                shortsSpinner.classList.add('d-none');
+            }
+        });
+        
+        // Copy Transcription to Clipboard
+        document.getElementById('copyTranscriptionBtn').addEventListener('click', function() {
+            const text = document.getElementById('transcriptionResult').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 2000);
+            });
+        });
+        
+        // Download Transcription
+        document.getElementById('downloadTranscriptionBtn').addEventListener('click', function() {
+            const text = document.getElementById('transcriptionResult').textContent;
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'transcription.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+}

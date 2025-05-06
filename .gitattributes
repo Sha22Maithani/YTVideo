@@ -1,0 +1,11 @@
+*.cs text=auto diff=csharp
+*.cshtml text=auto
+*.js text=auto
+*.json text=auto
+*.html text=auto
+*.css text=auto
+*.md text=auto
+*.csproj text=auto
+*.sln text=auto merge=union
+.gitattributes text=auto export-ignore
+.gitignore text=auto export-ignore 
