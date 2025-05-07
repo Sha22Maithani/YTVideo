@@ -4,6 +4,7 @@ using YShorts.Models;
 using YoutubeExplode;
 using YoutubeExplode.Videos;
 using YoutubeExplode.Videos.Streams;
+using YoutubeExplode.Converter;
 using System.IO;
 using System.Linq;
 
@@ -74,6 +75,30 @@ namespace YShorts.Services
             
             try
             {
+                // Try using the YoutubeExplode.Converter for faster, direct downloading
+                try
+                {
+                    _logger.LogInformation("Attempting to download video using optimized converter...");
+                    
+                    // Download with optimized settings
+                    await youtube.Videos.DownloadAsync(
+                        youtubeUrl, 
+                        outputPath, 
+                        o => o
+                            .SetPreset(ConversionPreset.UltraFast) // Use fastest preset
+                            .SetFFmpegPath("ffmpeg") // Use system ffmpeg
+                    );
+                    
+                    _logger.LogInformation("Successfully downloaded video using optimized converter");
+                    return outputPath;
+                }
+                catch (Exception converterEx)
+                {
+                    _logger.LogWarning("Optimized converter failed, falling back to manual method: {Message}", converterEx.Message);
+                    // Fall back to the original method if converter fails
+                }
+                
+                // Original implementation as fallback
                 // Get video info
                 var video = await youtube.Videos.GetAsync(videoId);
                 _logger.LogInformation("Successfully retrieved video info: {Title}", video.Title);
@@ -170,8 +195,8 @@ namespace YShorts.Services
                     process.StartInfo = new ProcessStartInfo
                     {
                         FileName = "ffmpeg",
-                        // Optimized command: use copy codec for video (no re-encoding), use fastest preset
-                        Arguments = $"-i \"{videoPath}\" -i \"{audioPath}\" -c:v copy -c:a aac -b:a 128k -preset ultrafast -movflags +faststart -progress pipe:1 \"{outputPath}\"",
+                        // Even faster muxing: use copy codec for both video and audio (no re-encoding), higher thread count
+                        Arguments = $"-y -i \"{videoPath}\" -i \"{audioPath}\" -c copy -movflags +faststart -threads 4 \"{outputPath}\"",
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
@@ -180,7 +205,7 @@ namespace YShorts.Services
                     
                     var progressTimer = new System.Timers.Timer(2000); // Log progress every 2 seconds
                     progressTimer.Elapsed += (sender, e) => {
-                        _logger.LogInformation("Muxing in progress... (This may take a few minutes for longer videos)");
+                        _logger.LogInformation("Muxing in progress...");
                     };
                     progressTimer.Start();
                     
@@ -234,13 +259,16 @@ namespace YShorts.Services
                     
                     try
                     {
-                        // Use FFmpeg to create the clip
+                        // Use FFmpeg to create the clip with stream copying (no re-encoding)
                         using (var process = new Process())
                         {
                             process.StartInfo = new ProcessStartInfo
                             {
                                 FileName = "ffmpeg",
-                                Arguments = $"-i \"{videoPath}\" -ss {startTime.TotalSeconds} -t {duration.TotalSeconds} -c:v libx264 -c:a aac -strict experimental \"{outputPath}\"",
+                                // Use -c copy for ultra-fast stream copying without re-encoding
+                                // Add -avoid_negative_ts 1 to handle timestamp issues
+                                // Use -vsync 2 for smoother video when cutting
+                                Arguments = $"-y -ss {startTime.TotalSeconds} -i \"{videoPath}\" -t {duration.TotalSeconds} -c copy -avoid_negative_ts 1 -vsync 2 \"{outputPath}\"",
                                 RedirectStandardOutput = true,
                                 RedirectStandardError = true,
                                 UseShellExecute = false,
@@ -254,7 +282,31 @@ namespace YShorts.Services
                             {
                                 var error = await process.StandardError.ReadToEndAsync();
                                 _logger.LogError("FFmpeg failed with error: {Error}", error);
-                                continue;
+                                
+                                // Fallback to slower but more reliable method if fast method fails
+                                _logger.LogInformation("Trying fallback method for clip creation...");
+                                using (var fallbackProcess = new Process())
+                                {
+                                    fallbackProcess.StartInfo = new ProcessStartInfo
+                                    {
+                                        FileName = "ffmpeg",
+                                        Arguments = $"-y -i \"{videoPath}\" -ss {startTime.TotalSeconds} -t {duration.TotalSeconds} -c:v libx264 -preset ultrafast -c:a aac -b:a 128k -threads 4 \"{outputPath}\"",
+                                        RedirectStandardOutput = true,
+                                        RedirectStandardError = true,
+                                        UseShellExecute = false,
+                                        CreateNoWindow = true
+                                    };
+                                    
+                                    fallbackProcess.Start();
+                                    await fallbackProcess.WaitForExitAsync();
+                                    
+                                    if (fallbackProcess.ExitCode != 0)
+                                    {
+                                        error = await fallbackProcess.StandardError.ReadToEndAsync();
+                                        _logger.LogError("Fallback FFmpeg method also failed: {Error}", error);
+                                        continue;
+                                    }
+                                }
                             }
                         }
                     }
@@ -265,14 +317,16 @@ namespace YShorts.Services
                     
                     try
                     {
-                        // Create a thumbnail
+                        // Create a thumbnail using a faster approach
                         var thumbnailPath = Path.Combine(_outputDir, $"thumbnail_{i + 1}.jpg");
                         using (var process = new Process())
                         {
                             process.StartInfo = new ProcessStartInfo
                             {
                                 FileName = "ffmpeg",
-                                Arguments = $"-i \"{outputPath}\" -ss 0 -frames:v 1 \"{thumbnailPath}\"",
+                                // Extract thumbnail directly from the source video at the start point
+                                // Faster than extracting from the output file
+                                Arguments = $"-y -ss {startTime.TotalSeconds} -i \"{videoPath}\" -frames:v 1 -q:v 2 -threads 2 \"{thumbnailPath}\"",
                                 RedirectStandardOutput = true,
                                 RedirectStandardError = true,
                                 UseShellExecute = false,
