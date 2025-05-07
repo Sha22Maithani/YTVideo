@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 builder.Services.AddSingleton<TranscriptionService>();
 builder.Services.AddSingleton<GeminiService>();
+builder.Services.AddSingleton<ShortsService>();
 
 // Register API keys in configuration
 builder.Configuration["AssemblyAI:ApiKey"] = "af7c531f7d254d27afb91b1b25f400de";

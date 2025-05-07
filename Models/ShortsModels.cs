@@ -9,6 +9,12 @@ namespace YShorts.Models
         public int Duration { get; set; } = 30;
     }
 
+    public class CreateShortsRequest
+    {
+        public string YoutubeUrl { get; set; } = string.Empty;
+        public List<BestMoment> BestMoments { get; set; } = new List<BestMoment>();
+    }
+
     public class ShortsGenerationResponse
     {
         public bool Success { get; set; }

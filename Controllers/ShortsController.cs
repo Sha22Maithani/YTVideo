@@ -10,57 +10,67 @@ namespace YShorts.Controllers
     public class ShortsController : ControllerBase
     {
         private readonly ILogger<ShortsController> _logger;
-        private readonly TranscriptionService _transcriptionService;
+        private readonly ShortsService _shortsService;
+        private readonly string _outputDir;
 
         public ShortsController(
             ILogger<ShortsController> logger,
-            TranscriptionService transcriptionService)
+            ShortsService shortsService)
         {
             _logger = logger;
-            _transcriptionService = transcriptionService;
+            _shortsService = shortsService;
+            _outputDir = Path.Combine(Path.GetTempPath(), "YShorts", "output");
         }
 
-        [HttpPost("generate")]
-        public async Task<IActionResult> GenerateShorts([FromBody] ShortsGenerationRequest request)
+        [HttpPost("create")]
+        public async Task<IActionResult> CreateShorts([FromBody] CreateShortsRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.YoutubeUrl))
             {
                 return BadRequest("YouTube URL is required");
             }
-
-            if (request.Count <= 0 || request.Count > 10)
+            
+            if (request.BestMoments == null || !request.BestMoments.Any())
             {
-                return BadRequest("Count must be between 1 and 10");
+                return BadRequest("Best moments are required");
             }
 
-            if (request.Duration < 15 || request.Duration > 60)
+            _logger.LogInformation("Received request to create shorts for URL: {Url}", request.YoutubeUrl);
+
+            var result = await _shortsService.CreateShortsFromBestMomentsAsync(request.YoutubeUrl, request.BestMoments);
+
+            if (!result.Success)
             {
-                return BadRequest("Duration must be between 15 and 60 seconds");
+                return BadRequest(result);
             }
 
-            _logger.LogInformation("Received shorts generation request for URL: {Url}, Count: {Count}, Duration: {Duration}s", 
-                request.YoutubeUrl, request.Count, request.Duration);
-
-            // TODO: Implement actual shorts generation
-            // This is a placeholder that returns mock data
-            var mockShorts = new List<ShortClip>();
-            for (int i = 1; i <= request.Count; i++)
+            return Ok(result);
+        }
+        
+        [HttpGet("download/{filename}")]
+        public IActionResult DownloadShort(string filename)
+        {
+            var filePath = Path.Combine(_outputDir, filename);
+            
+            if (!System.IO.File.Exists(filePath))
             {
-                mockShorts.Add(new ShortClip
-                {
-                    Id = i,
-                    Title = $"Short Clip {i}",
-                    Duration = $"0:{new Random().Next(20, 55)}",
-                    ThumbnailUrl = "https://via.placeholder.com/150",
-                    DownloadUrl = "#"
-                });
+                return NotFound($"Short clip {filename} not found");
             }
-
-            return Ok(new ShortsGenerationResponse 
-            { 
-                Success = true,
-                Shorts = mockShorts
-            });
+            
+            return PhysicalFile(filePath, "video/mp4", filename);
+        }
+        
+        [HttpGet("thumbnail/{filename}")]
+        public IActionResult GetThumbnail(string filename)
+        {
+            var filePath = Path.Combine(_outputDir, filename);
+            
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound($"Thumbnail {filename} not found");
+            }
+            
+            return PhysicalFile(filePath, "image/jpeg");
         }
     }
 } 

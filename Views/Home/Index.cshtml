@@ -94,28 +94,23 @@
                                         <input type="url" class="form-control" id="shortsYoutubeUrl" 
                                                placeholder="https://www.youtube.com/watch?v=..." required>
                                     </div>
+                                    <div class="form-text">Paste the URL of the YouTube video to create shorts from</div>
                                 </div>
                                 
-                                <div class="form-group mb-3">
-                                    <label for="shortsCount" class="form-label">Number of shorts to create:</label>
-                                    <input type="number" class="form-control" id="shortsCount" min="1" max="10" value="3">
-                                    <div class="form-text">How many short videos should be created from your content</div>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="shortsDuration" class="form-label">Duration per short (seconds):</label>
-                                    <input type="range" class="form-range" id="shortsDuration" min="15" max="60" step="5" value="30">
-                                    <div class="d-flex justify-content-between">
-                                        <span>15s</span>
-                                        <span id="durationValue">30s</span>
-                                        <span>60s</span>
+                                <div class="alert alert-info">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-info-circle fs-4 me-3"></i>
+                                        <div>
+                                            <p class="mb-1"><strong>All-in-one processing:</strong></p>
+                                            <p class="mb-0">This will automatically transcribe your video, extract the best moments using AI, and create YouTube Shorts from those moments.</p>
+                                        </div>
                                     </div>
                                 </div>
                                 
                                 <div class="d-grid">
                                     <button type="submit" class="btn btn-youtube" id="createShortsBtn">
                                         <span id="shortsSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
-                                        Create Shorts
+                                        <i class="fas fa-magic me-1"></i> Create Shorts Automatically
                                     </button>
                                 </div>
                             </form>
@@ -164,8 +159,36 @@
                     
                     <div id="shortsResultContainer" class="d-none">
                         <h5>Generated Shorts:</h5>
+                        <div class="alert alert-success mb-3">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle fs-4 me-3"></i>
+                                <div>
+                                    <p class="mb-1"><strong>YouTube Shorts Created Successfully!</strong></p>
+                                    <p class="mb-0">Your shorts are ready to download. Click on each one to view and download.</p>
+                                </div>
+                            </div>
+                        </div>
                         <div id="shortsResults" class="list-group mb-3">
                             <!-- Short clips will be dynamically added here -->
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
+                            <h5 class="mb-0">Transcription and Best Moments</h5>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#additionalInfo">
+                                <i class="fas fa-chevron-down me-1"></i> Show Details
+                            </button>
+                        </div>
+                        <div class="collapse" id="additionalInfo">
+                            <div class="card card-body mb-3">
+                                <h6>Best Moments:</h6>
+                                <div class="list-group mb-3" id="bestMomentsList">
+                                    <!-- Best moments will be dynamically added here -->
+                                </div>
+                                
+                                <h6 class="mt-3">Full Transcription:</h6>
+                                <div class="border p-3 bg-light rounded">
+                                    <pre id="shortsTranscriptionResult" class="mb-0" style="white-space: pre-wrap;"></pre>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
