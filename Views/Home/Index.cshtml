@@ -293,11 +293,6 @@
 
 @section Scripts {
     <script>
-        // Update duration value display
-        document.getElementById('shortsDuration').addEventListener('input', function() {
-            document.getElementById('durationValue').textContent = this.value + 's';
-        });
-        
         // Transcription Form Submit
         document.getElementById('transcriptionForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -430,13 +425,11 @@
             }
         });
         
-        // Shorts Form Submit - This is a placeholder since the endpoint isn't implemented yet
+        // Shorts Form Submit
         document.getElementById('shortsForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const youtubeUrl = document.getElementById('shortsYoutubeUrl').value;
-            const shortsCount = document.getElementById('shortsCount').value;
-            const shortsDuration = document.getElementById('shortsDuration').value;
             const createShortsBtn = document.getElementById('createShortsBtn');
             const shortsSpinner = document.getElementById('shortsSpinner');
             const errorMessage = document.getElementById('errorMessage');
@@ -462,9 +455,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ 
-                        youtubeUrl: youtubeUrl,
-                        count: parseInt(shortsCount),
-                        duration: parseInt(shortsDuration)
+                        youtubeUrl: youtubeUrl
                     })
                 });
                 
@@ -486,18 +477,20 @@
                                 </div>
                             </div>
                             <div>
+                                <button class="btn btn-sm btn-outline-success me-2 play-video-btn" data-id="${short.id}" data-url="${short.previewUrl}">
+                                    <i class="fas fa-play me-1"></i>Play
+                                </button>
                                 <a href="/api/shorts/preview/${short.fileName}" class="btn btn-sm btn-outline-success me-2" target="_blank">
-                                    <i class="fas fa-play me-1"></i>Preview
+                                    <i class="fas fa-external-link-alt me-1"></i>Preview
                                 </a>
                                 <a href="${short.downloadUrl}" class="btn btn-sm btn-outline-primary me-2" download>
                                     <i class="fas fa-download me-1"></i>Download
                                 </a>
                             </div>
                         </div>
-                        <!-- Video Preview Element -->
-                        <div class="collapse" id="preview-${short.id}">
-                            <div class="ratio ratio-16x9 mb-3">
-                                <video controls>
+                        <div id="video-container-${short.id}" class="video-container mt-3" style="display: none;">
+                            <div class="ratio ratio-16x9">
+                                <video id="video-${short.id}" controls>
                                     <source src="${short.previewUrl}" type="video/mp4">
                                     Your browser does not support the video tag.
                                 </video>
@@ -610,6 +603,45 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        });
+        
+        // Handle video play buttons
+        document.addEventListener('click', function(e) {
+            const playBtn = e.target.closest('.play-video-btn');
+            if (playBtn) {
+                e.preventDefault();
+                const videoId = playBtn.getAttribute('data-id');
+                const videoContainer = document.getElementById(`video-container-${videoId}`);
+                const video = document.getElementById(`video-${videoId}`);
+                
+                // Toggle video container visibility
+                if (videoContainer.style.display === 'none') {
+                    // Hide any other open videos first
+                    document.querySelectorAll('.video-container').forEach(container => {
+                        if (container !== videoContainer && container.style.display !== 'none') {
+                            container.style.display = 'none';
+                            const otherVideo = container.querySelector('video');
+                            if (otherVideo) {
+                                otherVideo.pause();
+                                otherVideo.currentTime = 0;
+                            }
+                        }
+                    });
+                    
+                    // Show and play this video
+                    videoContainer.style.display = 'block';
+                    if (video) {
+                        video.play().catch(err => console.log('Error playing video:', err));
+                    }
+                } else {
+                    // Hide and pause the video
+                    videoContainer.style.display = 'none';
+                    if (video) {
+                        video.pause();
+                        video.currentTime = 0;
+                    }
+                }
+            }
         });
     </script>
 }

@@ -202,22 +202,63 @@ function showShortsResult(shorts, moments, transcription) {
     
     $('#shortsResults').empty();
     
-    shorts.forEach(function(short) {
+    // Process all shorts and add transcriptions from corresponding moments
+    shorts.forEach(function(short, index) {
+        // Match the short with its corresponding moment based on title or index
+        // The title may contain the start timestamp which we can use to match
+        let matchedMoment = null;
+        
+        if (moments && moments.length > 0) {
+            // Try to find a moment that matches this short
+            // First attempt: by index if they're in the same order
+            if (index < moments.length) {
+                matchedMoment = moments[index];
+            }
+            
+            // Second attempt: try to match by timestamp in the title
+            if (!matchedMoment) {
+                const titleTimestamp = short.title.match(/(\d+:\d+)/);
+                if (titleTimestamp) {
+                    matchedMoment = moments.find(m => m.startTimestamp === titleTimestamp[1]);
+                }
+            }
+        }
+        
+        // Get the content for this short
+        const shortContent = matchedMoment ? matchedMoment.content : "No transcription available for this segment.";
+        
         const item = `
-            <div class="list-group-item">
-                <div class="row">
-                    <div class="col-md-4">
-                        <img src="${short.thumbnailUrl}" class="img-fluid rounded" alt="Thumbnail">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-dark text-white py-2">
+                    <h6 class="mb-0">Short #${short.id}: ${short.title}</h6>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Video player - always visible -->
+                    <div class="ratio ratio-16x9">
+                        <video id="video-${short.id}" class="w-100" controls poster="${short.thumbnailUrl}">
+                            <source src="${short.previewUrl}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
                     </div>
-                    <div class="col-md-8">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h5 class="mb-1">${short.title}</h5>
-                            <small>${short.duration}</small>
+                    
+                    <!-- Transcription section for this short -->
+                    <div class="p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div><small class="text-muted">Duration: ${short.duration}</small></div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-success me-2 play-video-btn" data-id="${short.id}">
+                                    <i class="fas fa-play me-1"></i>Play
+                                </button>
+                                <a href="${short.downloadUrl}" class="btn btn-sm btn-outline-primary" download>
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                            </div>
                         </div>
+                        
                         <div class="mt-3">
-                            <a href="${short.downloadUrl}" class="btn btn-sm btn-youtube" download>
-                                <i class="fas fa-download me-1"></i>Download Short
-                            </a>
+                            <h6 class="border-bottom pb-2">Transcription</h6>
+                            <p class="small text-muted mb-0">${shortContent}</p>
+                            ${matchedMoment ? `<div class="mt-2 small"><strong>Why it's great:</strong> ${matchedMoment.reason}</div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -226,6 +267,41 @@ function showShortsResult(shorts, moments, transcription) {
         $('#shortsResults').append(item);
     });
     
+    // Add event listener for play buttons
+    $('.play-video-btn').on('click', function(e) {
+        e.preventDefault();
+        const videoId = $(this).data('id');
+        const video = document.getElementById(`video-${videoId}`);
+        
+        // Pause any other playing videos first
+        $('video').each(function() {
+            if (this.id !== `video-${videoId}` && !this.paused) {
+                this.pause();
+            }
+        });
+        
+        // Play/pause this video
+        if (video.paused) {
+            video.play().catch(err => console.log('Error playing video:', err));
+            $(this).html('<i class="fas fa-pause me-1"></i>Pause');
+        } else {
+            video.pause();
+            $(this).html('<i class="fas fa-play me-1"></i>Play');
+        }
+    });
+    
+    // Listen for video play/pause events to update buttons
+    $('video').on('play', function() {
+        const videoId = this.id.replace('video-', '');
+        $(`button[data-id="${videoId}"].play-video-btn`).html('<i class="fas fa-pause me-1"></i>Pause');
+    });
+    
+    $('video').on('pause', function() {
+        const videoId = this.id.replace('video-', '');
+        $(`button[data-id="${videoId}"].play-video-btn`).html('<i class="fas fa-play me-1"></i>Play');
+    });
+    
+    // Also show the full list of best moments and transcription in the details section
     if (moments) {
         $('#bestMomentsList').empty().attr('data-moments', JSON.stringify(moments));
         moments.forEach(function(moment, index) {
