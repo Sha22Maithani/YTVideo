@@ -20,6 +20,7 @@ namespace YShorts.Models
         public bool Success { get; set; }
         public string? ErrorMessage { get; set; }
         public List<ShortClip> Shorts { get; set; } = new List<ShortClip>();
+        public string? OutputDirectory { get; set; }
     }
 
     public class ShortClip
@@ -29,5 +30,8 @@ namespace YShorts.Models
         public string Duration { get; set; } = string.Empty;
         public string ThumbnailUrl { get; set; } = string.Empty;
         public string DownloadUrl { get; set; } = string.Empty;
+        public string PreviewUrl { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
     }
 } 

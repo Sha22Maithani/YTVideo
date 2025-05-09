@@ -7,6 +7,7 @@ using YoutubeExplode.Videos.Streams;
 using YoutubeExplode.Converter;
 using System.IO;
 using System.Linq;
+using Microsoft.AspNetCore.Hosting;
 
 namespace YShorts.Services
 {
@@ -15,12 +16,29 @@ namespace YShorts.Services
         private readonly ILogger<ShortsService> _logger;
         private readonly string _tempDir;
         private readonly string _outputDir;
+        private readonly string _publicOutputDir;
+        private readonly IWebHostEnvironment _webHostEnvironment;
 
-        public ShortsService(ILogger<ShortsService> logger, IConfiguration configuration)
+        public ShortsService(ILogger<ShortsService> logger, IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
             _logger = logger;
+            _webHostEnvironment = webHostEnvironment;
+            
+            // Get configured directories from appsettings.json or use defaults
+            var configuredOutputDir = configuration["Shorts:OutputDirectory"];
             _tempDir = Path.Combine(Path.GetTempPath(), "YShorts", "temp");
-            _outputDir = Path.Combine(Path.GetTempPath(), "YShorts", "output");
+            
+            // If configured output directory is absolute, use it; otherwise, make it relative to wwwroot
+            if (!string.IsNullOrEmpty(configuredOutputDir) && Path.IsPathRooted(configuredOutputDir))
+            {
+                _outputDir = configuredOutputDir;
+            }
+            else
+            {
+                // Create a directory in wwwroot for public access
+                _publicOutputDir = string.IsNullOrEmpty(configuredOutputDir) ? "shorts" : configuredOutputDir;
+                _outputDir = Path.Combine(_webHostEnvironment.WebRootPath, _publicOutputDir);
+            }
             
             if (!Directory.Exists(_tempDir))
             {
@@ -31,6 +49,24 @@ namespace YShorts.Services
             {
                 Directory.CreateDirectory(_outputDir);
             }
+            
+            _logger.LogInformation("Shorts will be saved to: {OutputDir}", _outputDir);
+        }
+
+        /// <summary>
+        /// Gets the web-accessible URL for a short clip
+        /// </summary>
+        public string GetShortPreviewUrl(string filename)
+        {
+            return $"/{_publicOutputDir}/{filename}";
+        }
+        
+        /// <summary>
+        /// Gets the absolute file path for a short clip
+        /// </summary>
+        public string GetShortFilePath(string filename)
+        {
+            return Path.Combine(_outputDir, filename);
         }
 
         public async Task<ShortsGenerationResponse> CreateShortsFromBestMomentsAsync(string youtubeUrl, List<BestMoment> bestMoments)
@@ -51,7 +87,8 @@ namespace YShorts.Services
                 return new ShortsGenerationResponse
                 {
                     Success = true,
-                    Shorts = shorts
+                    Shorts = shorts,
+                    OutputDirectory = _outputDir
                 };
             }
             catch (Exception ex)
@@ -241,7 +278,8 @@ namespace YShorts.Services
             for (int i = 0; i < bestMoments.Count; i++)
             {
                 var moment = bestMoments[i];
-                var outputPath = Path.Combine(_outputDir, $"short_{i + 1}.mp4");
+                var shortFileName = $"short_{i + 1}.mp4";
+                var outputPath = Path.Combine(_outputDir, shortFileName);
                 
                 try
                 {
@@ -315,10 +353,13 @@ namespace YShorts.Services
                         throw new InvalidOperationException("FFmpeg is not installed or not in the system PATH. Please install FFmpeg: https://ffmpeg.org/download.html");
                     }
                     
+                    // Create thumbnails
+                    var thumbnailFileName = $"thumbnail_{i + 1}.jpg";
+                    var thumbnailPath = Path.Combine(_outputDir, thumbnailFileName);
+                    
                     try
                     {
                         // Create a thumbnail using a faster approach
-                        var thumbnailPath = Path.Combine(_outputDir, $"thumbnail_{i + 1}.jpg");
                         using (var process = new Process())
                         {
                             process.StartInfo = new ProcessStartInfo
@@ -343,15 +384,25 @@ namespace YShorts.Services
                         // Continue without thumbnail
                     }
                     
+                    // Create preview links
+                    var previewUrl = GetShortPreviewUrl(shortFileName);
+                    var thumbnailUrl = GetShortPreviewUrl(thumbnailFileName);
+                    
                     // Add the short to the list
                     shorts.Add(new ShortClip
                     {
                         Id = i + 1,
                         Title = $"Short {i + 1}: {moment.Content.Substring(0, Math.Min(50, moment.Content.Length))}...",
                         Duration = $"{duration.Minutes:D2}:{duration.Seconds:D2}",
-                        ThumbnailUrl = $"/api/shorts/thumbnail/{Path.GetFileName($"thumbnail_{i + 1}.jpg")}",
-                        DownloadUrl = $"/api/shorts/download/{Path.GetFileName(outputPath)}"
+                        ThumbnailUrl = thumbnailUrl,
+                        DownloadUrl = $"/api/shorts/download/{shortFileName}",
+                        PreviewUrl = previewUrl,
+                        FilePath = outputPath,
+                        FileName = shortFileName
                     });
+                    
+                    _logger.LogInformation("Created short clip: {Title} at {Path} (Preview: {PreviewUrl})", 
+                        $"Short {i + 1}", outputPath, previewUrl);
                 }
                 catch (Exception ex)
                 {

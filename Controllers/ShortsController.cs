@@ -11,7 +11,6 @@ namespace YShorts.Controllers
     {
         private readonly ILogger<ShortsController> _logger;
         private readonly ShortsService _shortsService;
-        private readonly string _outputDir;
 
         public ShortsController(
             ILogger<ShortsController> logger,
@@ -19,7 +18,6 @@ namespace YShorts.Controllers
         {
             _logger = logger;
             _shortsService = shortsService;
-            _outputDir = Path.Combine(Path.GetTempPath(), "YShorts", "output");
         }
 
         [HttpPost("create")]
@@ -50,20 +48,35 @@ namespace YShorts.Controllers
         [HttpGet("download/{filename}")]
         public IActionResult DownloadShort(string filename)
         {
-            var filePath = Path.Combine(_outputDir, filename);
+            var filePath = _shortsService.GetShortFilePath(filename);
             
             if (!System.IO.File.Exists(filePath))
             {
                 return NotFound($"Short clip {filename} not found");
             }
             
+            // Set Content-Disposition to attachment to trigger download
             return PhysicalFile(filePath, "video/mp4", filename);
+        }
+        
+        [HttpGet("preview/{filename}")]
+        public IActionResult PreviewShort(string filename)
+        {
+            var filePath = _shortsService.GetShortFilePath(filename);
+            
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound($"Short clip {filename} not found");
+            }
+            
+            // Set Content-Disposition to inline to allow browser playback
+            return PhysicalFile(filePath, "video/mp4", enableRangeProcessing: true);
         }
         
         [HttpGet("thumbnail/{filename}")]
         public IActionResult GetThumbnail(string filename)
         {
-            var filePath = Path.Combine(_outputDir, filename);
+            var filePath = _shortsService.GetShortFilePath(filename);
             
             if (!System.IO.File.Exists(filePath))
             {
