@@ -148,8 +148,16 @@ namespace YShorts.Controllers
                 });
             }
             
-            // Step 3: Create shorts from best moments
-            var shortsResult = await _shortsService.CreateShortsFromBestMomentsAsync(request.YoutubeUrl, extractionResult.Moments);
+            // Step 3: Create shorts from best moments with specified aspect ratio (or default to landscape)
+            AspectRatio aspectRatio = AspectRatio.Landscape; // Default
+            
+            // Try to get aspect ratio from request if provided
+            if (request.AspectRatio.HasValue)
+            {
+                aspectRatio = request.AspectRatio.Value;
+            }
+            
+            var shortsResult = await _shortsService.CreateShortsWithAspectRatioAsync(request.YoutubeUrl, extractionResult.Moments, aspectRatio);
             
             if (!shortsResult.Success)
             {

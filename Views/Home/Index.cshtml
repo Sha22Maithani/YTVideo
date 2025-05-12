@@ -97,12 +97,36 @@
                                     <div class="form-text">Paste the URL of the YouTube video to create shorts from</div>
                                 </div>
                                 
+                                <div class="mb-3">
+                                    <label class="form-label">Select frame size:</label>
+                                    <div class="d-flex justify-content-between">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="aspectRatio" id="landscape" value="0" checked>
+                                            <label class="form-check-label" for="landscape">
+                                                <i class="fas fa-tv me-1"></i> Landscape (16:9)
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="aspectRatio" id="portrait" value="1">
+                                            <label class="form-check-label" for="portrait">
+                                                <i class="fas fa-mobile-alt me-1"></i> Portrait (9:16)
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="aspectRatio" id="square" value="2">
+                                            <label class="form-check-label" for="square">
+                                                <i class="fas fa-square me-1"></i> Square (1:1)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div class="alert alert-info">
                                     <div class="d-flex align-items-center">
                                         <i class="fas fa-info-circle fs-4 me-3"></i>
                                         <div>
-                                            <p class="mb-1"><strong>All-in-one processing:</strong></p>
-                                            <p class="mb-0">This will automatically transcribe your video, extract the best moments using AI, and create YouTube Shorts from those moments.</p>
+                                            <p class="mb-1"><strong>Two-step processing:</strong></p>
+                                            <p class="mb-0">This will first show you previews of the best moments. Then you can select which ones to convert into actual video clips.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -110,7 +134,7 @@
                                 <div class="d-grid">
                                     <button type="submit" class="btn btn-youtube" id="createShortsBtn">
                                         <span id="shortsSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
-                                        <i class="fas fa-magic me-1"></i> Create Shorts Automatically
+                                        <i class="fas fa-search me-1"></i> Find Best Moments for Shorts
                                     </button>
                                 </div>
                             </form>
@@ -158,19 +182,45 @@
                     </div>
                     
                     <div id="shortsResultContainer" class="d-none">
-                        <h5>Generated Shorts:</h5>
+                        <h5>Best Moments for Shorts:</h5>
                         <div class="alert alert-success mb-3">
                             <div class="d-flex align-items-center">
                                 <i class="fas fa-check-circle fs-4 me-3"></i>
                                 <div>
-                                    <p class="mb-1"><strong>YouTube Shorts Created Successfully!</strong></p>
-                                    <p class="mb-0">Your shorts are ready to download. Click on each one to view and download.</p>
+                                    <p class="mb-1"><strong>Best Moments Found!</strong></p>
+                                    <p class="mb-0">Select the moments you want to convert into shorts, then click "Generate Selected Shorts".</p>
                                 </div>
                             </div>
                         </div>
                         <div id="shortsResults" class="list-group mb-3">
                             <!-- Short clips will be dynamically added here -->
                         </div>
+                        
+                        <!-- Generate Selected Shorts Button -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button id="generateSelectedShortsBtn" class="btn btn-primary" disabled>
+                                <span id="generateShortsSpinner" class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
+                                <i class="fas fa-film me-1"></i> Generate Selected Shorts
+                            </button>
+                        </div>
+                        
+                        <!-- Generated Shorts Container -->
+                        <div id="generatedShortsContainer" class="mt-4 d-none">
+                            <h5>Generated Shorts:</h5>
+                            <div class="alert alert-success mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-check-circle fs-4 me-3"></i>
+                                    <div>
+                                        <p class="mb-1"><strong>YouTube Shorts Created Successfully!</strong></p>
+                                        <p class="mb-0">Your shorts are ready to preview and download.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="generatedShortsList" class="list-group mb-3">
+                                <!-- Generated short clips will be dynamically added here -->
+                            </div>
+                        </div>
+                        
                         <div class="d-flex justify-content-between align-items-center mt-4 mb-2">
                             <h5 class="mb-0">Transcription and Best Moments</h5>
                             <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#additionalInfo">
@@ -430,6 +480,7 @@
             e.preventDefault();
             
             const youtubeUrl = document.getElementById('shortsYoutubeUrl').value;
+            const aspectRatio = document.querySelector('input[name="aspectRatio"]:checked').value;
             const createShortsBtn = document.getElementById('createShortsBtn');
             const shortsSpinner = document.getElementById('shortsSpinner');
             const errorMessage = document.getElementById('errorMessage');
@@ -438,35 +489,210 @@
             const shortsResultContainer = document.getElementById('shortsResultContainer');
             const bestMomentsResultContainer = document.getElementById('bestMomentsResultContainer');
             const shortsResults = document.getElementById('shortsResults');
+            const generateSelectedShortsBtn = document.getElementById('generateSelectedShortsBtn');
+            const generatedShortsContainer = document.getElementById('generatedShortsContainer');
             
             // Reset UI
             errorMessage.classList.add('d-none');
             errorMessage.textContent = '';
             shortsResults.innerHTML = '';
+            generatedShortsContainer.classList.add('d-none');
             
             // Show loading state
             createShortsBtn.disabled = true;
             shortsSpinner.classList.remove('d-none');
             
             try {
-                const response = await fetch('/api/shorts/generate', {
+                // First, transcribe and find best moments
+                const transcribeResponse = await fetch('/api/transcription/transcribe-and-extract', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ youtubeUrl })
+                });
+                
+                const transcribeData = await transcribeResponse.json();
+                
+                if (!transcribeResponse.ok || !transcribeData.success) {
+                    throw new Error(transcribeData.errorMessage || 'Failed to transcribe video and extract best moments');
+                }
+                
+                // Then, create short previews with the specified aspect ratio
+                const response = await fetch('/api/shorts/create-with-aspect', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ 
-                        youtubeUrl: youtubeUrl
+                        youtubeUrl: youtubeUrl,
+                        bestMoments: transcribeData.bestMoments,
+                        aspectRatio: parseInt(aspectRatio)
                     })
                 });
                 
                 const data = await response.json();
                 
                 if (!response.ok || !data.success) {
-                    throw new Error(data.errorMessage || 'Failed to generate shorts');
+                    throw new Error(data.errorMessage || 'Failed to generate shorts previews');
                 }
                 
-                // Display results
+                // Store the source video path for later use
+                window.sourceVideoPath = data.sourceVideoPath;
+                
+                // Store the shorts data for later use
+                window.shortsData = data;
+                
+                // Display results with checkboxes for selection
                 shortsResults.innerHTML = data.shorts.map(short => `
+                    <div class="list-group-item">
+                        <div class="form-check">
+                            <input class="form-check-input short-selection" type="checkbox" value="${short.id}" id="short-check-${short.id}" data-short-id="${short.id}">
+                            <label class="form-check-label" for="short-check-${short.id}">
+                                <div class="d-flex w-100 justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <div class="me-3 text-center">
+                                            <span class="badge bg-secondary mb-1">Moment #${short.id}</span><br>
+                                            <small class="text-muted">${short.duration}</small>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-1">${short.title}</h6>
+                                            <p class="mb-1 small text-truncate" style="max-width: 400px;">
+                                                ${short.additionalProperties?.content || ""}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-success preview-moment-btn" 
+                                                data-id="${short.id}" 
+                                                data-start="${short.additionalProperties?.StartTimeSeconds || 0}" 
+                                                data-duration="${short.additionalProperties?.EndTimeSeconds - short.additionalProperties?.StartTimeSeconds || 30}"
+                                                data-video-path="${window.sourceVideoPath}">
+                                            <i class="fas fa-play me-1"></i>Preview
+                                        </button>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                        <div id="preview-container-${short.id}" class="video-container mt-3" style="display: none;">
+                            <div class="ratio ratio-16x9">
+                                <video id="preview-video-${short.id}" controls></video>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Enable the Generate Selected Shorts button when at least one short is selected
+                const shortCheckboxes = document.querySelectorAll('.short-selection');
+                shortCheckboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', function() {
+                        const selectedCount = document.querySelectorAll('.short-selection:checked').length;
+                        generateSelectedShortsBtn.disabled = selectedCount === 0;
+                        generateSelectedShortsBtn.textContent = selectedCount > 0 ? 
+                            `Generate ${selectedCount} Selected Shorts` : 
+                            'Generate Selected Shorts';
+                    });
+                });
+                
+                // Display result
+                resultCard.classList.remove('d-none');
+                transcriptionResultContainer.classList.add('d-none');
+                shortsResultContainer.classList.remove('d-none');
+                bestMomentsResultContainer.classList.add('d-none');
+                
+                // Scroll to results
+                resultCard.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                // Show error
+                errorMessage.textContent = error.message || "An error occurred while generating shorts previews.";
+                errorMessage.classList.remove('d-none');
+                resultCard.classList.remove('d-none');
+                
+            } finally {
+                // Reset loading state
+                createShortsBtn.disabled = false;
+                shortsSpinner.classList.add('d-none');
+            }
+        });
+        
+        // Generate Selected Shorts Button Click
+        document.getElementById('generateSelectedShortsBtn').addEventListener('click', async function() {
+            const generateSelectedShortsBtn = document.getElementById('generateSelectedShortsBtn');
+            const generateShortsSpinner = document.getElementById('generateShortsSpinner');
+            const errorMessage = document.getElementById('errorMessage');
+            const generatedShortsContainer = document.getElementById('generatedShortsContainer');
+            const generatedShortsList = document.getElementById('generatedShortsList');
+            
+            // Get selected shorts
+            const selectedShortIds = Array.from(document.querySelectorAll('.short-selection:checked'))
+                .map(checkbox => parseInt(checkbox.value));
+            
+            if (selectedShortIds.length === 0) {
+                alert('Please select at least one short to generate.');
+                return;
+            }
+            
+            // Get all shorts data
+            const allShorts = [];
+            document.querySelectorAll('.short-selection').forEach(checkbox => {
+                const shortId = parseInt(checkbox.getAttribute('data-short-id'));
+                if (selectedShortIds.includes(shortId)) {
+                    // Find the corresponding short data from the previous response
+                    const shortData = window.shortsData.shorts.find(s => s.id === shortId);
+                    if (shortData) {
+                        // Create a copy of the short data with explicit start time and duration
+                        const shortClip = {
+                            id: shortData.id,
+                            title: shortData.title,
+                            duration: shortData.duration,
+                            thumbnailUrl: shortData.thumbnailUrl,
+                            downloadUrl: shortData.downloadUrl,
+                            previewUrl: shortData.previewUrl,
+                            filePath: shortData.filePath,
+                            fileName: shortData.fileName,
+                            aspectRatio: shortData.aspectRatio,
+                            // Include these properties with proper capitalization to match C# model
+                            StartTimeSeconds: parseFloat(document.querySelector(`.preview-moment-btn[data-id="${shortId}"]`).getAttribute('data-start')),
+                            EndTimeSeconds: parseFloat(document.querySelector(`.preview-moment-btn[data-id="${shortId}"]`).getAttribute('data-start')) + 
+                                           parseFloat(document.querySelector(`.preview-moment-btn[data-id="${shortId}"]`).getAttribute('data-duration')),
+                            Content: shortData.title.split(': ')[1]
+                        };
+                        allShorts.push(shortClip);
+                    }
+                }
+            });
+            
+            // Show loading state
+            generateSelectedShortsBtn.disabled = true;
+            generateShortsSpinner.classList.remove('d-none');
+            
+            try {
+                console.log("Sending request to generate shorts:", {
+                    sourceVideoPath: window.sourceVideoPath,
+                    selectedShorts: allShorts
+                });
+                
+                const response = await fetch('/api/shorts/generate-selected', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        sourceVideoPath: window.sourceVideoPath,
+                        selectedShorts: allShorts
+                    })
+                });
+                
+                const data = await response.json();
+                console.log("Response from server:", data);
+                
+                if (!response.ok || !data.success) {
+                    throw new Error(data.errorMessage || 'Failed to generate selected shorts');
+                }
+                
+                // Display generated shorts
+                generatedShortsList.innerHTML = data.shorts.map(short => `
                     <div class="list-group-item list-group-item-action">
                         <div class="d-flex w-100 justify-content-between align-items-center mb-3">
                             <div class="d-flex align-items-center">
@@ -512,28 +738,24 @@
                             </div>
                         </div>
                     `;
-                    shortsResults.appendChild(directoryInfo);
+                    generatedShortsList.appendChild(directoryInfo);
                 }
                 
-                // Display result
-                resultCard.classList.remove('d-none');
-                transcriptionResultContainer.classList.add('d-none');
-                shortsResultContainer.classList.remove('d-none');
-                bestMomentsResultContainer.classList.add('d-none');
+                // Show generated shorts container
+                generatedShortsContainer.classList.remove('d-none');
                 
-                // Scroll to results
-                resultCard.scrollIntoView({ behavior: 'smooth' });
+                // Scroll to generated shorts
+                generatedShortsContainer.scrollIntoView({ behavior: 'smooth' });
                 
             } catch (error) {
                 // Show error
-                errorMessage.textContent = error.message || "An error occurred while generating shorts.";
+                errorMessage.textContent = error.message || "An error occurred while generating selected shorts.";
                 errorMessage.classList.remove('d-none');
-                resultCard.classList.remove('d-none');
                 
             } finally {
                 // Reset loading state
-                createShortsBtn.disabled = false;
-                shortsSpinner.classList.add('d-none');
+                generateSelectedShortsBtn.disabled = false;
+                generateShortsSpinner.classList.add('d-none');
             }
         });
         
@@ -640,6 +862,90 @@
                         video.pause();
                         video.currentTime = 0;
                     }
+                }
+            }
+        });
+        
+        // Handle preview moment buttons
+        document.addEventListener('click', function(e) {
+            const previewBtn = e.target.closest('.preview-moment-btn');
+            if (previewBtn) {
+                e.preventDefault();
+                const momentId = previewBtn.getAttribute('data-id');
+                const startTime = parseFloat(previewBtn.getAttribute('data-start'));
+                const duration = parseFloat(previewBtn.getAttribute('data-duration'));
+                const videoPath = previewBtn.getAttribute('data-video-path');
+                
+                const previewContainer = document.getElementById(`preview-container-${momentId}`);
+                const previewVideo = document.getElementById(`preview-video-${momentId}`);
+                
+                // Toggle preview container visibility
+                if (previewContainer.style.display === 'none') {
+                    // Show loading indicator on the button
+                    const originalBtnText = previewBtn.innerHTML;
+                    previewBtn.disabled = true;
+                    previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Loading...';
+                    
+                    // Hide any other open videos first
+                    document.querySelectorAll('.video-container').forEach(container => {
+                        if (container !== previewContainer && container.style.display !== 'none') {
+                            container.style.display = 'none';
+                            const otherVideo = container.querySelector('video');
+                            if (otherVideo) {
+                                otherVideo.pause();
+                                otherVideo.currentTime = 0;
+                            }
+                        }
+                    });
+                    
+                    // Set up video source - this will create a preview segment on the server
+                    const source = document.createElement('source');
+                    source.src = `/api/shorts/preview-moment?videoPath=${encodeURIComponent(videoPath)}&startTime=${startTime}&duration=${duration}`;
+                    source.type = 'video/mp4';
+                    
+                    // Clear any existing sources
+                    while (previewVideo.firstChild) {
+                        previewVideo.removeChild(previewVideo.firstChild);
+                    }
+                    
+                    previewVideo.appendChild(source);
+                    
+                    // When the video is loaded and ready to play
+                    previewVideo.addEventListener('canplay', function onCanPlay() {
+                        // Remove the event listener to avoid multiple calls
+                        previewVideo.removeEventListener('canplay', onCanPlay);
+                        
+                        // Show the preview container
+                        previewContainer.style.display = 'block';
+                        
+                        // Play the video
+                        previewVideo.play().catch(err => console.log('Error playing video:', err));
+                        
+                        // Change button text and re-enable it
+                        previewBtn.disabled = false;
+                        previewBtn.innerHTML = '<i class="fas fa-times me-1"></i>Close Preview';
+                    });
+                    
+                    // Handle errors
+                    previewVideo.addEventListener('error', function() {
+                        console.error('Error loading video preview');
+                        previewBtn.disabled = false;
+                        previewBtn.innerHTML = originalBtnText;
+                        alert('Error loading video preview. Please try again.');
+                    });
+                    
+                    // Load the video
+                    previewVideo.load();
+                } else {
+                    // Hide and pause the video
+                    previewContainer.style.display = 'none';
+                    if (previewVideo) {
+                        previewVideo.pause();
+                        previewVideo.currentTime = 0;
+                    }
+                    
+                    // Change button text back
+                    previewBtn.innerHTML = '<i class="fas fa-play me-1"></i>Preview';
                 }
             }
         });

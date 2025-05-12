@@ -5,6 +5,7 @@ namespace YShorts.Models
     public class VideoUrlRequest
     {
         public string YoutubeUrl { get; set; } = string.Empty;
+        public AspectRatio? AspectRatio { get; set; }
     }
 
     public class TranscriptionResponse

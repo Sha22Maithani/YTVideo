@@ -78,6 +78,7 @@ $(document).ready(function() {
     $('#shortsForm').on('submit', function(e) {
         e.preventDefault();
         const youtubeUrl = $('#shortsYoutubeUrl').val();
+        const aspectRatio = $('input[name="aspectRatio"]:checked').val();
         
         if (!youtubeUrl) {
             showError("Please enter a YouTube URL");
@@ -86,12 +87,15 @@ $(document).ready(function() {
         
         showLoading('#createShortsBtn', '#shortsSpinner');
         
-        // Call API to create shorts
+        // Call API to create shorts with selected aspect ratio
         $.ajax({
             url: '/api/Transcription/transcribe-extract-create',
             type: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify({ youtubeUrl: youtubeUrl }),
+            data: JSON.stringify({ 
+                youtubeUrl: youtubeUrl,
+                aspectRatio: parseInt(aspectRatio) 
+            }),
             success: function(response) {
                 hideLoading('#createShortsBtn', '#shortsSpinner');
                 if (response.success) {
@@ -202,126 +206,298 @@ function showShortsResult(shorts, moments, transcription) {
     
     $('#shortsResults').empty();
     
-    // Process all shorts and add transcriptions from corresponding moments
-    shorts.forEach(function(short, index) {
-        // Match the short with its corresponding moment based on title or index
-        // The title may contain the start timestamp which we can use to match
-        let matchedMoment = null;
-        
-        if (moments && moments.length > 0) {
-            // Try to find a moment that matches this short
-            // First attempt: by index if they're in the same order
-            if (index < moments.length) {
-                matchedMoment = moments[index];
-            }
+    // Store the source video path for reuse
+    window.sourceVideoPath = shorts.length > 0 ? shorts[0].sourceVideoPath : null;
+    
+    // Show best moments list for preview and selection
+    if (moments && moments.length > 0) {
+        moments.forEach(function(moment, index) {
+            // Find the matching short if it exists
+            const matchingShort = shorts.find(s => s.id === index + 1);
             
-            // Second attempt: try to match by timestamp in the title
-            if (!matchedMoment) {
-                const titleTimestamp = short.title.match(/(\d+:\d+)/);
-                if (titleTimestamp) {
-                    matchedMoment = moments.find(m => m.startTimestamp === titleTimestamp[1]);
-                }
-            }
-        }
-        
-        // Get the content for this short
-        const shortContent = matchedMoment ? matchedMoment.content : "No transcription available for this segment.";
-        
-        const item = `
-            <div class="card mb-4 shadow-sm">
-                <div class="card-header bg-dark text-white py-2">
-                    <h6 class="mb-0">Short #${short.id}: ${short.title}</h6>
-                </div>
-                <div class="card-body p-0">
-                    <!-- Video player - always visible -->
-                    <div class="ratio ratio-16x9">
-                        <video id="video-${short.id}" class="w-100" controls poster="${short.thumbnailUrl}">
-                            <source src="${short.previewUrl}" type="video/mp4">
-                            Your browser does not support the video tag.
-                        </video>
+            const item = `
+                <div class="card mb-4 shadow-sm" id="moment-card-${index + 1}">
+                    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Moment #${index + 1}: ${moment.startTimestamp} - ${moment.endTimestamp}</h6>
+                        <button class="btn btn-sm btn-outline-light preview-moment-btn" data-index="${index + 1}" data-start="${moment.startTimestamp}" data-end="${moment.endTimestamp}">
+                            <i class="fas fa-eye me-1"></i>Preview
+                        </button>
                     </div>
-                    
-                    <!-- Transcription section for this short -->
-                    <div class="p-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div><small class="text-muted">Duration: ${short.duration}</small></div>
-                            <div>
-                                <button class="btn btn-sm btn-outline-success me-2 play-video-btn" data-id="${short.id}">
-                                    <i class="fas fa-play me-1"></i>Play
+                    <div class="card-body p-3">
+                        <p class="mb-1">${moment.content}</p>
+                        <div class="small text-muted mb-3"><i class="fas fa-comment-alt me-1"></i>${moment.reason}</div>
+                        
+                        <div class="preview-container d-none" id="preview-container-${index + 1}">
+                            <div class="ratio ratio-16x9 mb-3">
+                                <div id="player-${index + 1}" class="player-container"></div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Select frame size for this clip:</label>
+                                <div class="d-flex justify-content-between">
+                                    <div class="form-check">
+                                        <input class="form-check-input aspect-radio" type="radio" name="aspect-${index + 1}" id="landscape-${index + 1}" value="0" checked data-index="${index + 1}">
+                                        <label class="form-check-label" for="landscape-${index + 1}">
+                                            <i class="fas fa-tv me-1"></i> Landscape
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input aspect-radio" type="radio" name="aspect-${index + 1}" id="portrait-${index + 1}" value="1" data-index="${index + 1}">
+                                        <label class="form-check-label" for="portrait-${index + 1}">
+                                            <i class="fas fa-mobile-alt me-1"></i> Portrait
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input aspect-radio" type="radio" name="aspect-${index + 1}" id="square-${index + 1}" value="2" data-index="${index + 1}">
+                                        <label class="form-check-label" for="square-${index + 1}">
+                                            <i class="fas fa-square me-1"></i> Square
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3 action-buttons-${index + 1} d-none">
+                                <button class="btn btn-sm btn-success create-clip-btn" data-index="${index + 1}">
+                                    <i class="fas fa-cut me-1"></i>Create Clip
                                 </button>
-                                <a href="${short.downloadUrl}" class="btn btn-sm btn-outline-primary" download>
-                                    <i class="fas fa-download me-1"></i>Download
+                                
+                                <a href="#" class="btn btn-sm btn-primary download-clip-btn d-none" id="download-clip-${index + 1}" download>
+                                    <i class="fas fa-download me-1"></i>Download Clip
                                 </a>
                             </div>
                         </div>
                         
-                        <div class="mt-3">
-                            <h6 class="border-bottom pb-2">Transcription</h6>
-                            <p class="small text-muted mb-0">${shortContent}</p>
-                            ${matchedMoment ? `<div class="mt-2 small"><strong>Why it's great:</strong> ${matchedMoment.reason}</div>` : ''}
+                        <div class="clip-result d-none" id="clip-result-${index + 1}">
+                            <div class="ratio ratio-16x9 mb-3">
+                                <video id="clip-video-${index + 1}" class="w-100" controls>
+                                    <source src="" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                            
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-3">
+                                <button class="btn btn-sm btn-outline-success play-clip-btn" data-index="${index + 1}">
+                                    <i class="fas fa-play me-1"></i>Play
+                                </button>
+                                
+                                <a href="#" class="btn btn-sm btn-outline-primary download-result-btn" id="download-result-${index + 1}" download>
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        `;
-        $('#shortsResults').append(item);
-    });
-    
-    // Add event listener for play buttons
-    $('.play-video-btn').on('click', function(e) {
-        e.preventDefault();
-        const videoId = $(this).data('id');
-        const video = document.getElementById(`video-${videoId}`);
+            `;
+            $('#shortsResults').append(item);
+        });
         
-        // Pause any other playing videos first
-        $('video').each(function() {
-            if (this.id !== `video-${videoId}` && !this.paused) {
-                this.pause();
+        // Add preview functionality
+        $('.preview-moment-btn').on('click', function() {
+            const index = $(this).data('index');
+            const startTime = $(this).data('start');
+            const endTime = $(this).data('end');
+            
+            // Toggle preview container
+            $(`#preview-container-${index}`).toggleClass('d-none');
+            
+            // Initialize or reload player if not already loaded
+            if ($(`#player-${index}`).children().length === 0) {
+                initYouTubePreview(index, startTime, endTime);
+            }
+            
+            // Show action buttons
+            $(`.action-buttons-${index}`).removeClass('d-none');
+            
+            // Change button text
+            if ($(`#preview-container-${index}`).hasClass('d-none')) {
+                $(this).html('<i class="fas fa-eye me-1"></i>Preview');
+            } else {
+                $(this).html('<i class="fas fa-eye-slash me-1"></i>Hide Preview');
             }
         });
         
-        // Play/pause this video
-        if (video.paused) {
-            video.play().catch(err => console.log('Error playing video:', err));
-            $(this).html('<i class="fas fa-pause me-1"></i>Pause');
-        } else {
-            video.pause();
-            $(this).html('<i class="fas fa-play me-1"></i>Play');
-        }
-    });
-    
-    // Listen for video play/pause events to update buttons
-    $('video').on('play', function() {
-        const videoId = this.id.replace('video-', '');
-        $(`button[data-id="${videoId}"].play-video-btn`).html('<i class="fas fa-pause me-1"></i>Pause');
-    });
-    
-    $('video').on('pause', function() {
-        const videoId = this.id.replace('video-', '');
-        $(`button[data-id="${videoId}"].play-video-btn`).html('<i class="fas fa-play me-1"></i>Play');
-    });
-    
-    // Also show the full list of best moments and transcription in the details section
-    if (moments) {
-        $('#bestMomentsList').empty().attr('data-moments', JSON.stringify(moments));
-        moments.forEach(function(moment, index) {
-            const item = `
-                <div class="list-group-item">
-                    <div class="d-flex w-100 justify-content-between">
-                        <h5 class="mb-1">Moment ${index + 1}</h5>
-                        <small>${moment.startTimestamp} - ${moment.endTimestamp}</small>
-                    </div>
-                    <p class="mb-1">${moment.content}</p>
-                    <small class="text-muted"><i class="fas fa-comment-alt me-1"></i>${moment.reason}</small>
-                </div>
-            `;
-            $('#bestMomentsList').append(item);
+        // Handle aspect ratio changes
+        $('.aspect-radio').on('change', function() {
+            const index = $(this).data('index');
+            // No immediate action needed - the selection will be used when creating the clip
+        });
+        
+        // Handle create clip button
+        $('.create-clip-btn').on('click', function() {
+            const index = $(this).data('index');
+            const aspectRatio = $(`input[name="aspect-${index}"]:checked`).val();
+            const moment = moments[index - 1]; // index is 1-based, array is 0-based
+            
+            $(this).prop('disabled', true);
+            $(this).html('<i class="fas fa-spinner fa-spin me-1"></i>Creating...');
+            
+            // Use the cached source video path if available
+            const requestData = {
+                bestMoments: [moment],
+                aspectRatio: parseInt(aspectRatio)
+            };
+            
+            // If we have a cached source video path, use it instead of downloading again
+            if (window.sourceVideoPath) {
+                requestData.sourceVideoPath = window.sourceVideoPath;
+                
+                $.ajax({
+                    url: '/api/shorts/generate-selected',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        sourceVideoPath: window.sourceVideoPath,
+                        selectedShorts: [{
+                            id: index,
+                            title: `Moment ${index}`,
+                            aspectRatio: parseInt(aspectRatio),
+                            startTimeSeconds: convertTimestampToSeconds(moment.startTimestamp),
+                            endTimeSeconds: convertTimestampToSeconds(moment.endTimestamp),
+                            content: moment.content
+                        }]
+                    }),
+                    success: function(response) {
+                        if (response.success && response.shorts && response.shorts.length > 0) {
+                            const short = response.shorts[0];
+                            
+                            // Update the clip result container
+                            $(`#clip-result-${index}`).removeClass('d-none');
+                            
+                            // Set correct video source with type
+                            const videoElement = document.getElementById(`clip-video-${index}`);
+                            videoElement.innerHTML = `<source src="${short.previewUrl}" type="video/mp4">`;
+                            videoElement.load(); // Important: reload the video element
+                            
+                            // Set the download link with a proper filename
+                            const aspectName = ['landscape', 'portrait', 'square'][parseInt(aspectRatio)];
+                            const downloadFileName = `short_${index}_${aspectName}.mp4`;
+                            $(`#download-result-${index}`)
+                                .attr('href', short.downloadUrl)
+                                .attr('download', downloadFileName);
+                            
+                            // Re-enable the button
+                            $(`.create-clip-btn[data-index="${index}"]`).prop('disabled', false).html('<i class="fas fa-cut me-1"></i>Create Clip');
+                            
+                            showToast("Clip created successfully!");
+                        } else {
+                            $(`.create-clip-btn[data-index="${index}"]`).prop('disabled', false).html('<i class="fas fa-cut me-1"></i>Create Clip');
+                            showToast("Error creating clip. Please try again.");
+                        }
+                    },
+                    error: function() {
+                        $(`.create-clip-btn[data-index="${index}"]`).prop('disabled', false).html('<i class="fas fa-cut me-1"></i>Create Clip');
+                        showToast("Error creating clip. Please try again.");
+                    }
+                });
+            } else {
+                // Fallback to the original method if no cached video path
+                requestData.youtubeUrl = $('#shortsYoutubeUrl').val();
+                
+                $.ajax({
+                    url: '/api/shorts/create-with-aspect',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(requestData),
+                    success: function(response) {
+                        if (response.success && response.shorts && response.shorts.length > 0) {
+                            const short = response.shorts[0];
+                            
+                            // Cache the source video path for future use
+                            window.sourceVideoPath = response.sourceVideoPath;
+                            
+                            // Update the clip result container
+                            $(`#clip-result-${index}`).removeClass('d-none');
+                            
+                            // Set correct video source with type
+                            const videoElement = document.getElementById(`clip-video-${index}`);
+                            videoElement.innerHTML = `<source src="${short.previewUrl}" type="video/mp4">`;
+                            videoElement.load(); // Important: reload the video element
+                            
+                            // Set the download link with a proper filename
+                            const aspectName = ['landscape', 'portrait', 'square'][parseInt(aspectRatio)];
+                            const downloadFileName = `short_${index}_${aspectName}.mp4`;
+                            $(`#download-result-${index}`)
+                                .attr('href', short.downloadUrl)
+                                .attr('download', downloadFileName);
+                            
+                            // Re-enable the button
+                            $(`.create-clip-btn[data-index="${index}"]`).prop('disabled', false).html('<i class="fas fa-cut me-1"></i>Create Clip');
+                            
+                            showToast("Clip created successfully!");
+                        } else {
+                            $(`.create-clip-btn[data-index="${index}"]`).prop('disabled', false).html('<i class="fas fa-cut me-1"></i>Create Clip');
+                            showToast("Error creating clip. Please try again.");
+                        }
+                    },
+                    error: function() {
+                        $(`.create-clip-btn[data-index="${index}"]`).prop('disabled', false).html('<i class="fas fa-cut me-1"></i>Create Clip');
+                        showToast("Error creating clip. Please try again.");
+                    }
+                });
+            }
+        });
+        
+        // Handle play clip button
+        $('.play-clip-btn').on('click', function() {
+            const index = $(this).data('index');
+            const video = document.getElementById(`clip-video-${index}`);
+            
+            if (video.paused) {
+                video.play();
+                $(this).html('<i class="fas fa-pause me-1"></i>Pause');
+            } else {
+                video.pause();
+                $(this).html('<i class="fas fa-play me-1"></i>Play');
+            }
         });
     }
     
     if (transcription) {
         $('#shortsTranscriptionResult').text(transcription);
     }
+}
+
+// Initialize YouTube player for preview
+function initYouTubePreview(index, startTime, endTime) {
+    const youtubeUrl = $('#shortsYoutubeUrl').val();
+    const videoId = getYouTubeVideoId(youtubeUrl);
+    
+    if (!videoId) {
+        showToast("Invalid YouTube URL. Cannot preview.");
+        return;
+    }
+    
+    // Convert timestamp format (mm:ss) to seconds
+    const startSeconds = convertTimestampToSeconds(startTime);
+    
+    // Create YouTube player
+    new YT.Player(`player-${index}`, {
+        videoId: videoId,
+        playerVars: {
+            start: startSeconds,
+            autoplay: 1,
+            controls: 1,
+            rel: 0
+        },
+        events: {
+            onReady: function(event) {
+                // Player is ready
+            }
+        }
+    });
+}
+
+// Helper function to extract YouTube video ID from URL
+function getYouTubeVideoId(url) {
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : false;
+}
+
+// Helper function to convert timestamp (mm:ss) to seconds
+function convertTimestampToSeconds(timestamp) {
+    const parts = timestamp.split(':');
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
 }
 
 function copyToClipboard(text) {
