@@ -36,6 +36,8 @@ namespace YShorts.Models
         public List<ShortClip> Shorts { get; set; } = new List<ShortClip>();
         public string? OutputDirectory { get; set; }
         public string? SourceVideoPath { get; set; } // Path to the source video for later processing
+        public string? FolderName { get; set; } // Name of the folder where all content is stored
+        public string? FolderPath { get; set; } // Web-accessible path to the folder
     }
 
     public class ShortClip
@@ -56,5 +58,28 @@ namespace YShorts.Models
         
         // Flag to indicate if the video has been generated
         public bool IsGenerated { get; set; }
+    }
+
+    public class CreateClipRequest
+    {
+        public string VideoPath { get; set; } = string.Empty;
+        public double StartTime { get; set; }
+        public double EndTime { get; set; }
+        public string Title { get; set; } = string.Empty;
+    }
+
+    public class ClipResult
+    {
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+        public string? FilePath { get; set; }
+        public string? FileName { get; set; }
+        public string? PreviewUrl { get; set; }
+        public string? DownloadUrl { get; set; }
+        public string? ThumbnailUrl { get; set; }
+        public string? Title { get; set; }
+        public string? Duration { get; set; }
+        public string? FolderName { get; set; } // Name of the folder containing the clip
+        public string? FolderPath { get; set; } // Web-accessible path to the folder
     }
 } 

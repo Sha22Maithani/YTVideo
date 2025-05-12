@@ -188,7 +188,7 @@
                                 <i class="fas fa-check-circle fs-4 me-3"></i>
                                 <div>
                                     <p class="mb-1"><strong>Best Moments Found!</strong></p>
-                                    <p class="mb-0">Select the moments you want to convert into shorts, then click "Generate Selected Shorts".</p>
+                                    <p class="mb-0">Select moments you want to convert into shorts, then click "Generate Selected Shorts". Or click "Create Clip" on any moment to directly create a single clip.</p>
                                 </div>
                             </div>
                         </div>
@@ -206,13 +206,13 @@
                         
                         <!-- Generated Shorts Container -->
                         <div id="generatedShortsContainer" class="mt-4 d-none">
-                            <h5>Generated Shorts:</h5>
+                            <h5>Generated Videos:</h5>
                             <div class="alert alert-success mb-3">
                                 <div class="d-flex align-items-center">
                                     <i class="fas fa-check-circle fs-4 me-3"></i>
                                     <div>
-                                        <p class="mb-1"><strong>YouTube Shorts Created Successfully!</strong></p>
-                                        <p class="mb-0">Your shorts are ready to preview and download.</p>
+                                        <p class="mb-1"><strong>Videos Created Successfully!</strong></p>
+                                        <p class="mb-0">Your shorts and clips are ready to preview and download.</p>
                                     </div>
                                 </div>
                             </div>
@@ -563,12 +563,20 @@
                                         </div>
                                     </div>
                                     <div>
-                                        <button class="btn btn-sm btn-outline-success preview-moment-btn" 
+                                        <button class="btn btn-sm btn-outline-success me-2 preview-moment-btn" 
                                                 data-id="${short.id}" 
                                                 data-start="${short.additionalProperties?.StartTimeSeconds || 0}" 
                                                 data-duration="${short.additionalProperties?.EndTimeSeconds - short.additionalProperties?.StartTimeSeconds || 30}"
                                                 data-video-path="${window.sourceVideoPath}">
                                             <i class="fas fa-play me-1"></i>Preview
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-primary create-clip-btn" 
+                                                data-id="${short.id}" 
+                                                data-start="${short.additionalProperties?.StartTimeSeconds || 0}" 
+                                                data-end="${short.additionalProperties?.EndTimeSeconds || 30}"
+                                                data-video-path="${window.sourceVideoPath}"
+                                                data-title="${short.title}">
+                                            <i class="fas fa-scissors me-1"></i>Create Clip
                                         </button>
                                     </div>
                                 </div>
@@ -947,6 +955,143 @@
                     // Change button text back
                     previewBtn.innerHTML = '<i class="fas fa-play me-1"></i>Preview';
                 }
+            }
+        });
+        
+        // Handle create clip buttons in shorts preview
+        document.addEventListener('click', function(e) {
+            const createClipBtn = e.target.closest('.create-clip-btn');
+            if (createClipBtn) {
+                e.preventDefault();
+                
+                createClipBtn.disabled = true;
+                const originalBtnText = createClipBtn.innerHTML;
+                createClipBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Creating...';
+                
+                const videoPath = createClipBtn.getAttribute('data-video-path');
+                const startTime = parseFloat(createClipBtn.getAttribute('data-start'));
+                const endTime = parseFloat(createClipBtn.getAttribute('data-end'));
+                const title = createClipBtn.getAttribute('data-title');
+                const errorMessage = document.getElementById('errorMessage');
+                const resultCard = document.getElementById('resultCard');
+                
+                // Create clip using the API
+                fetch('/api/shorts/create-clip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        videoPath: videoPath,
+                        startTime: startTime,
+                        endTime: endTime,
+                        title: title
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        throw new Error(data.errorMessage || 'Failed to create clip');
+                    }
+                    
+                    // Show success notification
+                    const notification = document.createElement('div');
+                    notification.className = 'alert alert-success mt-3';
+                    notification.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-check-circle me-3 fs-4"></i>
+                            <div>
+                                <p class="mb-1"><strong>Clip Created Successfully!</strong></p>
+                                <p class="mb-0">Your clip has been saved and is ready to <a href="${data.previewUrl}" target="_blank">preview</a> or <a href="${data.downloadUrl}" download>download</a>.</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add notification below the preview
+                    const momentId = createClipBtn.getAttribute('data-id');
+                    const previewContainer = document.getElementById(`preview-container-${momentId}`);
+                    
+                    // If preview container is visible, add it there
+                    if (previewContainer && previewContainer.style.display !== 'none') {
+                        previewContainer.appendChild(notification);
+                    } else {
+                        // Otherwise find the list item containing this button
+                        const listItem = createClipBtn.closest('.list-group-item');
+                        listItem.appendChild(notification);
+                    }
+                    
+                    // Add to the generated clips section if it exists
+                    let generatedShortsList = document.getElementById('generatedShortsList');
+                    let generatedShortsContainer = document.getElementById('generatedShortsContainer');
+                    
+                    if (!generatedShortsList) {
+                        generatedShortsContainer = document.createElement('div');
+                        generatedShortsContainer.id = 'generatedShortsContainer';
+                        generatedShortsContainer.className = 'mt-4';
+                        generatedShortsContainer.innerHTML = `
+                            <h5>Generated Videos:</h5>
+                            <div class="list-group mb-3" id="generatedShortsList"></div>
+                        `;
+                        document.getElementById('shortsResultContainer').appendChild(generatedShortsContainer);
+                        generatedShortsList = document.getElementById('generatedShortsList');
+                    }
+                    
+                    if (generatedShortsContainer) {
+                        generatedShortsContainer.classList.remove('d-none');
+                    }
+                    
+                    // Add clip to the generated list
+                    const clipElement = document.createElement('div');
+                    clipElement.className = 'list-group-item list-group-item-action';
+                    clipElement.innerHTML = `
+                        <div class="d-flex w-100 justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center">
+                                <img src="${data.thumbnailUrl}" class="img-thumbnail me-3" style="width: 80px; height: 80px;">
+                                <div>
+                                    <h6 class="mb-1">${data.title}</h6>
+                                    <p class="mb-1"><small>Duration: ${data.duration}</small></p>
+                                </div>
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-success me-2 play-video-btn" data-id="clip-${Date.now()}" data-url="${data.previewUrl}">
+                                    <i class="fas fa-play me-1"></i>Play
+                                </button>
+                                <a href="${data.previewUrl}" class="btn btn-sm btn-outline-success me-2" target="_blank">
+                                    <i class="fas fa-external-link-alt me-1"></i>Preview
+                                </a>
+                                <a href="${data.downloadUrl}" class="btn btn-sm btn-outline-primary me-2" download>
+                                    <i class="fas fa-download me-1"></i>Download
+                                </a>
+                            </div>
+                        </div>
+                        <div id="video-container-clip-${Date.now()}" class="video-container mt-3" style="display: none;">
+                            <div class="ratio ratio-16x9">
+                                <video id="video-clip-${Date.now()}" controls>
+                                    <source src="${data.previewUrl}" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        </div>
+                    `;
+                    
+                    generatedShortsList.appendChild(clipElement);
+                    
+                    // Scroll to the generated clips section if it's newly created
+                    if (generatedShortsContainer) {
+                        generatedShortsContainer.scrollIntoView({ behavior: 'smooth' });
+                    }
+                })
+                .catch(error => {
+                    // Show error message
+                    errorMessage.textContent = error.message || "An error occurred while creating the clip.";
+                    errorMessage.classList.remove('d-none');
+                    resultCard.classList.remove('d-none');
+                })
+                .finally(() => {
+                    // Re-enable button and restore text
+                    createClipBtn.disabled = false;
+                    createClipBtn.innerHTML = originalBtnText;
+                });
             }
         });
     </script>

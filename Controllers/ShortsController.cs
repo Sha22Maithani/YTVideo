@@ -85,7 +85,9 @@ namespace YShorts.Controllers
         [HttpGet("download/{filename}")]
         public IActionResult DownloadShort(string filename)
         {
-            var filePath = _shortsService.GetShortFilePath(filename);
+            // Create a default folder for backwards compatibility with existing links
+            string defaultFolder = "default";
+            var filePath = _shortsService.GetShortFilePath(defaultFolder, filename);
             
             if (!System.IO.File.Exists(filePath))
             {
@@ -96,10 +98,26 @@ namespace YShorts.Controllers
             return PhysicalFile(filePath, "video/mp4", filename);
         }
         
+        [HttpGet("download/{folder}/{filename}")]
+        public IActionResult DownloadShortFromFolder(string folder, string filename)
+        {
+            var filePath = _shortsService.GetShortFilePathFromFolder(folder, filename);
+            
+            if (!System.IO.File.Exists(filePath))
+            {
+                return NotFound($"Short clip {filename} not found in folder {folder}");
+            }
+            
+            // Set Content-Disposition to attachment to trigger download
+            return PhysicalFile(filePath, "video/mp4", filename);
+        }
+        
         [HttpGet("preview/{filename}")]
         public IActionResult PreviewShort(string filename)
         {
-            var filePath = _shortsService.GetShortFilePath(filename);
+            // Create a default folder for backwards compatibility with existing links
+            string defaultFolder = "default";
+            var filePath = _shortsService.GetShortFilePath(defaultFolder, filename);
             
             if (!System.IO.File.Exists(filePath))
             {
@@ -113,7 +131,9 @@ namespace YShorts.Controllers
         [HttpGet("thumbnail/{filename}")]
         public IActionResult GetThumbnail(string filename)
         {
-            var filePath = _shortsService.GetShortFilePath(filename);
+            // Create a default folder for backwards compatibility with existing links
+            string defaultFolder = "default";
+            var filePath = _shortsService.GetShortFilePath(defaultFolder, filename);
             
             if (!System.IO.File.Exists(filePath))
             {
@@ -233,6 +253,37 @@ namespace YShorts.Controllers
                 _logger.LogError(ex, "Error creating video preview: {Message}", ex.Message);
                 return StatusCode(500, "Error creating video preview");
             }
+        }
+
+        [HttpPost("create-clip")]
+        public async Task<IActionResult> CreateClip([FromBody] CreateClipRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.VideoPath))
+            {
+                return BadRequest("Video path is required");
+            }
+            
+            if (!System.IO.File.Exists(request.VideoPath))
+            {
+                return BadRequest("Video file does not exist");
+            }
+
+            if (request.StartTime < 0 || request.EndTime <= request.StartTime)
+            {
+                return BadRequest("Invalid time range");
+            }
+
+            _logger.LogInformation("Received request to create clip from video: {VideoPath} from {Start} to {End}", 
+                request.VideoPath, request.StartTime, request.EndTime);
+
+            var result = await _shortsService.CreateClipAsync(request.VideoPath, request.StartTime, request.EndTime, request.Title);
+
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+
+            return Ok(result);
         }
     }
 } 
